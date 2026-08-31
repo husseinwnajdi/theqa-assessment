@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { transitionErrorResponse } from "@/lib/api-errors";
 import { prisma } from "@/lib/prisma";
+import { sessionEvents } from "@/lib/sessionEvents";
 import { assertCanSubmitReport, resolveVerificationState } from "@/lib/sessionTransitions";
 
 const VERIFICATION_SERVICE_URL =
@@ -91,6 +92,8 @@ export async function POST(
       data: { state: finalState },
     }),
   ]);
+
+  sessionEvents.emit(updatedSession.id);
 
   return NextResponse.json({ session: updatedSession, result });
 }
