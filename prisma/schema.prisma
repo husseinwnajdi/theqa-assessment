@@ -1,0 +1,78 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Participant {
+  id       String    @id @default(cuid())
+  name     String
+  email    String    @unique
+  sessions Session[]
+}
+
+model Task {
+  id            String    @id @default(cuid())
+  title         String
+  description   String
+  targetLat     Float
+  targetLng     Float
+  radiusMeters  Int
+  sessions      Session[]
+}
+
+enum SessionState {
+  ASSIGNED
+  ACTIVE
+  ENDED
+  REPORT_SUBMITTED
+  VERIFIED
+  FLAGGED
+  INCONCLUSIVE
+}
+
+model Session {
+  id            String        @id @default(cuid())
+  task          Task          @relation(fields: [taskId], references: [id])
+  taskId        String
+  participant   Participant   @relation(fields: [participantId], references: [id])
+  participantId String
+  state         SessionState  @default(ASSIGNED)
+  startedAt     DateTime?
+  endedAt       DateTime?
+  lastPingAt    DateTime?
+  pings         LocationPing[]
+  report        Report?
+  result        VerificationResult?
+  createdAt     DateTime      @default(now())
+}
+
+model LocationPing {
+  id             String   @id @default(cuid())
+  session        Session  @relation(fields: [sessionId], references: [id])
+  sessionId      String
+  lat            Float
+  lng            Float
+  accuracyMeters Float
+  timestamp      DateTime @default(now())
+}
+
+model Report {
+  id          String   @id @default(cuid())
+  session     Session  @relation(fields: [sessionId], references: [id])
+  sessionId   String   @unique
+  text        String
+  submittedAt DateTime @default(now())
+}
+
+model VerificationResult {
+  id              String   @id @default(cuid())
+  session         Session  @relation(fields: [sessionId], references: [id])
+  sessionId       String   @unique
+  confidenceScore Int
+  reasons         String[]
+  computedAt      DateTime @default(now())
+}
