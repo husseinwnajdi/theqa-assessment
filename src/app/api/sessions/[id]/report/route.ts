@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { Prisma } from "@prisma/client";
+
 import { transitionErrorResponse } from "@/lib/api-errors";
 import { prisma } from "@/lib/prisma";
 import { sessionEvents } from "@/lib/sessionEvents";
@@ -38,15 +40,25 @@ export async function POST(
 
   const body: ReportBody = await request.json();
 
-  await prisma.$transaction([
-    prisma.report.create({
-      data: { sessionId: session.id, text: body.text },
-    }),
-    prisma.session.update({
-      where: { id: session.id },
-      data: { state: "REPORT_SUBMITTED" },
-    }),
-  ]);
+  try {
+    await prisma.$transaction([
+      prisma.report.create({
+        data: { sessionId: session.id, text: body.text },
+      }),
+      prisma.session.update({
+        where: { id: session.id },
+        data: { state: "REPORT_SUBMITTED" },
+      }),
+    ]);
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return NextResponse.json(
+        { error: "Report already submitted for this session" },
+        { status: 400 }
+      );
+    }
+    throw error;
+  }
 
   const pings = await prisma.locationPing.findMany({
     where: { sessionId: session.id },

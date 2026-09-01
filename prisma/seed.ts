@@ -3,8 +3,10 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function main(): Promise<void> {
-  const participant = await prisma.participant.create({
-    data: {
+  const participant = await prisma.participant.upsert({
+    where: { email: "jane.doe@example.com" },
+    update: {},
+    create: {
       name: "Jane Doe",
       email: "jane.doe@example.com",
     },

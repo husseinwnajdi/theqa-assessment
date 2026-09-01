@@ -10,7 +10,7 @@ Two services:
   Owns all verification/scoring logic. Next.js never reimplements this
   logic in TypeScript (see [CLAUDE.md](./CLAUDE.md)).
 
-Both currently expose only a health-check route; no business logic yet.
+See [CLAUDE.md](./CLAUDE.md) for architecture decisions and the session state machine.
 
 ## Prerequisites
 
@@ -53,6 +53,22 @@ uvicorn app.main:app --reload --port 8000
 Runs on [http://localhost:8000](http://localhost:8000).
 
 - Health check: `GET http://localhost:8000/health` → `{"status":"ok"}`
+
+## Tests
+
+Next.js (Vitest):
+
+```bash
+npm test
+```
+
+Verification service (pytest):
+
+```bash
+cd verification-service
+pip install -r requirements-dev.txt   # adds pytest on top of requirements.txt
+pytest
+```
 
 ## Notes
 
