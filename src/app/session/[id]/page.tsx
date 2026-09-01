@@ -2,7 +2,27 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { SESSION_STATE_BADGE_CLASSES, type SessionState } from "@/lib/sessionStateStyles";
+import { AppHeader } from "@/components/AppHeader";
+import { Button } from "@/components/Button";
+import { Card } from "@/components/Card";
+import { ConfidenceBar } from "@/components/ConfidenceBar";
+import {
+  AlertTriangleIcon,
+  CheckCircleIcon,
+  HelpCircleIcon,
+  InfoCircleIcon,
+  MapPinIcon,
+  XCircleIcon,
+} from "@/components/icons";
+import { Spinner } from "@/components/Spinner";
+import { StateBadge } from "@/components/StateBadge";
+import { SESSION_STATE_STYLES, type SessionState } from "@/lib/design-tokens";
+
+const RESULT_ICONS: Record<"VERIFIED" | "FLAGGED" | "INCONCLUSIVE", typeof CheckCircleIcon> = {
+  VERIFIED: CheckCircleIcon,
+  FLAGGED: XCircleIcon,
+  INCONCLUSIVE: HelpCircleIcon,
+};
 
 interface Task {
   title: string;
@@ -167,113 +187,177 @@ export default function SessionPage({ params }: { params: { id: string } }) {
 
   if (loadError) {
     return (
-      <main className="p-6">
-        <p className="text-red-700">{loadError}</p>
-      </main>
+      <div className="min-h-screen">
+        <AppHeader />
+        <main className="mx-auto max-w-xl px-6 py-8">
+          <Card className="p-6 text-red-700">{loadError}</Card>
+        </main>
+      </div>
     );
   }
 
   if (!session) {
     return (
-      <main className="p-6">
-        <p>Loading…</p>
-      </main>
+      <div className="min-h-screen">
+        <AppHeader />
+        <main className="mx-auto max-w-xl px-6 py-8">
+          <p className="text-sm text-slate-500">Loading…</p>
+        </main>
+      </div>
     );
   }
 
+  const isFinalState =
+    session.state === "VERIFIED" || session.state === "FLAGGED" || session.state === "INCONCLUSIVE";
+
   return (
-    <main className="p-6 max-w-lg mx-auto space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">{session.task.title}</h1>
-        <span
-          className={`px-2 py-1 rounded text-xs font-medium ${SESSION_STATE_BADGE_CLASSES[session.state]}`}
-        >
-          {session.state}
-        </span>
-      </div>
-
-      {actionError && <p className="text-red-700 text-sm">{actionError}</p>}
-
-      {session.state === "ASSIGNED" && (
-        <div className="space-y-3">
-          <p className="text-sm">{session.task.description}</p>
-          <button onClick={handleStart} className="px-4 py-2 bg-blue-600 text-white rounded">
-            Start Visit
-          </button>
+    <div className="min-h-screen">
+      <AppHeader />
+      <main className="mx-auto max-w-xl space-y-6 px-6 py-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-2xl font-bold text-slate-900">{session.task.title}</h1>
+          <StateBadge state={session.state} />
         </div>
-      )}
 
-      {session.state === "ACTIVE" && (
-        <div className="space-y-3">
-          <p className="text-xs text-gray-600">
-            Your device location is being collected periodically while this visit is active,
-            to help verify you were at the task location.
-          </p>
+        {actionError && (
+          <Card className="border-red-200 bg-red-50 p-4 text-sm text-red-700">{actionError}</Card>
+        )}
 
-          {geoError && <p className="text-amber-700 text-sm">{geoError}</p>}
+        {session.state === "ASSIGNED" && (
+          <Card className="space-y-4 p-6">
+            <p className="text-sm leading-relaxed text-slate-600">{session.task.description}</p>
+            <Button onClick={handleStart}>Start Visit</Button>
+          </Card>
+        )}
 
-          {position ? (
-            <div className="text-sm space-y-1">
-              <p>Lat: {position.lat.toFixed(6)}</p>
-              <p>Lng: {position.lng.toFixed(6)}</p>
-              <p>Accuracy: {position.accuracyMeters.toFixed(0)}m</p>
-              {position.accuracyMeters > POOR_ACCURACY_THRESHOLD_METERS && (
-                <p className="text-amber-700">
-                  GPS accuracy is poor ({position.accuracyMeters.toFixed(0)}m). Verification
-                  may be less reliable.
-                </p>
+        {session.state === "ACTIVE" && (
+          <div className="space-y-4">
+            <Card className="flex gap-3 border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              <InfoCircleIcon className="h-5 w-5 flex-shrink-0 text-slate-400" />
+              <p>
+                Your device location is being collected periodically while this visit is
+                active, to help verify you were at the task location.
+              </p>
+            </Card>
+
+            {geoError && (
+              <Card className="flex gap-3 border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                <AlertTriangleIcon className="h-5 w-5 flex-shrink-0 text-amber-500" />
+                <p>{geoError}</p>
+              </Card>
+            )}
+
+            <Card className="p-5">
+              <div className="flex items-center gap-2 text-sm font-medium text-slate-900">
+                <MapPinIcon className="h-5 w-5 text-slate-400" />
+                Current location
+              </div>
+
+              {position ? (
+                <div className="mt-4 space-y-3">
+                  <dl className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <dt className="text-slate-500">Latitude</dt>
+                      <dd className="tabular-nums text-slate-900">{position.lat.toFixed(6)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-500">Longitude</dt>
+                      <dd className="tabular-nums text-slate-900">{position.lng.toFixed(6)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-500">Accuracy</dt>
+                      <dd className="tabular-nums text-slate-900">
+                        {position.accuracyMeters.toFixed(0)}m
+                      </dd>
+                    </div>
+                  </dl>
+
+                  {position.accuracyMeters > POOR_ACCURACY_THRESHOLD_METERS && (
+                    <div className="flex gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+                      <AlertTriangleIcon className="h-5 w-5 flex-shrink-0 text-amber-500" />
+                      <p>
+                        GPS accuracy is poor ({position.accuracyMeters.toFixed(0)}m).
+                        Verification may be less reliable.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                !geoError && (
+                  <p className="mt-4 text-sm text-slate-400">Waiting for location…</p>
+                )
               )}
+            </Card>
+
+            <Button variant="secondary" onClick={handleEnd}>
+              End Visit
+            </Button>
+          </div>
+        )}
+
+        {session.state === "ENDED" && (
+          <Card className="space-y-4 p-6">
+            <textarea
+              value={reportText}
+              onChange={(event) => setReportText(event.target.value)}
+              placeholder="Describe your visit..."
+              className="w-full rounded-lg border border-slate-300 p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:bg-slate-50 disabled:text-slate-400"
+              rows={5}
+              disabled={submittingReport}
+            />
+            <Button onClick={handleSubmitReport} disabled={submittingReport}>
+              {submittingReport && <Spinner className="h-4 w-4" />}
+              {submittingReport ? "Submitting…" : "Submit Report"}
+            </Button>
+            {submittingReport && (
+              <p className="text-sm text-slate-500">Verifying your visit…</p>
+            )}
+          </Card>
+        )}
+
+        {session.state === "REPORT_SUBMITTED" && (
+          <Card className="flex items-center gap-3 p-6 text-sm text-slate-600">
+            <Spinner className="h-4 w-4 text-slate-400" />
+            Verifying your visit…
+          </Card>
+        )}
+
+        {isFinalState && (
+          <Card className="p-6">
+            <div className="flex items-center gap-3">
+              {(() => {
+                const ResultIcon =
+                  RESULT_ICONS[session.state as "VERIFIED" | "FLAGGED" | "INCONCLUSIVE"];
+                return (
+                  <ResultIcon
+                    className={`h-9 w-9 flex-shrink-0 ${SESSION_STATE_STYLES[session.state].textClassName}`}
+                  />
+                );
+              })()}
+              <p className={`text-xl font-bold ${SESSION_STATE_STYLES[session.state].textClassName}`}>
+                {SESSION_STATE_STYLES[session.state].label}
+              </p>
             </div>
-          ) : (
-            !geoError && <p className="text-sm text-gray-600">Waiting for location…</p>
-          )}
 
-          <button onClick={handleEnd} className="px-4 py-2 bg-gray-800 text-white rounded">
-            End Visit
-          </button>
-        </div>
-      )}
-
-      {session.state === "ENDED" && (
-        <div className="space-y-3">
-          <textarea
-            value={reportText}
-            onChange={(event) => setReportText(event.target.value)}
-            placeholder="Describe your visit..."
-            className="w-full border rounded p-2 text-sm"
-            rows={5}
-            disabled={submittingReport}
-          />
-          <button
-            onClick={handleSubmitReport}
-            disabled={submittingReport}
-            className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50"
-          >
-            {submittingReport ? "Submitting…" : "Submit Report"}
-          </button>
-          {submittingReport && <p className="text-sm text-gray-600">Verifying your visit…</p>}
-        </div>
-      )}
-
-      {session.state === "REPORT_SUBMITTED" && <p>Verifying your visit…</p>}
-
-      {(session.state === "VERIFIED" ||
-        session.state === "FLAGGED" ||
-        session.state === "INCONCLUSIVE") && (
-        <div className="space-y-2">
-          <p className="font-medium">Result: {session.state}</p>
-          {session.result && (
-            <>
-              <p className="text-sm">Confidence score: {session.result.confidenceScore}/100</p>
-              <ul className="list-disc list-inside text-sm">
-                {session.result.reasons.map((reason) => (
-                  <li key={reason}>{reason}</li>
-                ))}
-              </ul>
-            </>
-          )}
-        </div>
-      )}
-    </main>
+            {session.result && (
+              <div className="mt-5 space-y-4">
+                <ConfidenceBar
+                  score={session.result.confidenceScore}
+                  colorClassName={SESSION_STATE_STYLES[session.state].accentClassName}
+                />
+                <ul className="space-y-1.5 text-sm text-slate-600">
+                  {session.result.reasons.map((reason) => (
+                    <li key={reason} className="flex gap-2">
+                      <span className="text-slate-300">•</span>
+                      {reason}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </Card>
+        )}
+      </main>
+    </div>
   );
 }
