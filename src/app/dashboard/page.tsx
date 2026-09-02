@@ -4,33 +4,33 @@ import { useEffect, useRef, useState } from "react";
 
 import { AppHeader } from "@/components/AppHeader";
 import { Card } from "@/components/Card";
-import { ConfidenceBar } from "@/components/ConfidenceBar";
-import { StateBadge } from "@/components/StateBadge";
-import { SESSION_STATE_STYLES, type SessionState } from "@/lib/design-tokens";
+import type { SessionState } from "@/lib/design-tokens";
 
 import { AssignableTaskCard } from "./AssignableTaskCard";
 import { CreateTaskForm, type CreatedTask } from "./CreateTaskForm";
+import { TaskSessionsCard, type TaskWithSessions } from "./TaskSessionsCard";
 
-interface DashboardSession {
+interface StreamedSession {
   id: string;
+  taskId: string;
   state: SessionState;
-  task: { title: string };
+  participant: { name: string; email: string };
   result: { confidenceScore: number; reasons: string[] } | null;
 }
 
 const FLASH_DURATION_MS = 1600;
 
 export default function DashboardPage() {
-  const [sessions, setSessions] = useState<DashboardSession[]>([]);
+  const [taskGroups, setTaskGroups] = useState<TaskWithSessions[]>([]);
   const [loading, setLoading] = useState(true);
   const [tasks, setTasks] = useState<CreatedTask[]>([]);
   const [flashingIds, setFlashingIds] = useState<Set<string>>(new Set());
   const flashTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => {
-    fetch("/api/dashboard/sessions")
+    fetch("/api/dashboard/tasks-with-sessions")
       .then((res) => res.json())
-      .then((data: DashboardSession[]) => setSessions(data))
+      .then((data: TaskWithSessions[]) => setTaskGroups(data))
       .finally(() => setLoading(false));
   }, []);
 
@@ -38,14 +38,20 @@ export default function DashboardPage() {
     const source = new EventSource("/api/dashboard/stream");
 
     source.onmessage = (event: MessageEvent<string>) => {
-      const updated: DashboardSession = JSON.parse(event.data);
-      setSessions((prev) => {
-        const index = prev.findIndex((s) => s.id === updated.id);
-        if (index === -1) return [updated, ...prev];
-        const next = [...prev];
-        next[index] = updated;
-        return next;
-      });
+      const updated: StreamedSession = JSON.parse(event.data);
+      setTaskGroups((prev) =>
+        prev.map((task) => {
+          if (task.id !== updated.taskId) return task;
+          const index = task.sessions.findIndex((s) => s.id === updated.id);
+          const nextSessions = [...task.sessions];
+          if (index === -1) {
+            nextSessions.unshift(updated);
+          } else {
+            nextSessions[index] = updated;
+          }
+          return { ...task, sessions: nextSessions };
+        })
+      );
 
       setFlashingIds((prev) => new Set(prev).add(updated.id));
       const existingTimer = flashTimers.current.get(updated.id);
@@ -99,46 +105,17 @@ export default function DashboardPage() {
 
         {loading ? (
           <p className="text-sm text-slate-500">Loading sessions…</p>
-        ) : sessions.length === 0 ? (
+        ) : taskGroups.length === 0 ? (
           <Card className="p-10 text-center">
-            <p className="font-medium text-slate-900">No sessions yet</p>
+            <p className="font-medium text-slate-900">No tasks yet</p>
             <p className="mt-1 text-sm text-slate-500">
-              Sessions will appear here once participants are assigned tasks.
+              Create a task above to start assigning visits to participants.
             </p>
           </Card>
         ) : (
-          <div className="space-y-3">
-            {sessions.map((session) => (
-              <Card
-                key={session.id}
-                className={`p-5 transition-colors ${flashingIds.has(session.id) ? "flash-highlight" : ""}`}
-              >
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h2 className="text-base font-semibold text-slate-900">
-                    {session.task.title}
-                  </h2>
-                  <StateBadge state={session.state} />
-                </div>
-
-                {session.result ? (
-                  <div className="mt-4 space-y-3">
-                    <ConfidenceBar
-                      score={session.result.confidenceScore}
-                      colorClassName={SESSION_STATE_STYLES[session.state].accentClassName}
-                    />
-                    <ul className="space-y-1 text-sm text-slate-500">
-                      {session.result.reasons.map((reason) => (
-                        <li key={reason} className="flex gap-2">
-                          <span className="text-slate-300">•</span>
-                          {reason}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : (
-                  <p className="mt-4 text-sm text-slate-400">Not yet verified</p>
-                )}
-              </Card>
+          <div className="space-y-4">
+            {taskGroups.map((task) => (
+              <TaskSessionsCard key={task.id} task={task} flashingIds={flashingIds} />
             ))}
           </div>
         )}

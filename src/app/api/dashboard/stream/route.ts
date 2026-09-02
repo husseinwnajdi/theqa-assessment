@@ -12,7 +12,7 @@ export async function GET(request: Request): Promise<Response> {
       const sendSession = async (sessionId: string): Promise<void> => {
         const session = await prisma.session.findUnique({
           where: { id: sessionId },
-          include: { task: true, result: true },
+          include: { task: true, result: true, participant: true },
         });
         if (!session) return;
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(session)}\n\n`));
