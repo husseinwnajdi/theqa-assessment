@@ -17,6 +17,7 @@ import {
 import { Spinner } from "@/components/Spinner";
 import { StateBadge } from "@/components/StateBadge";
 import { SESSION_STATE_STYLES, type SessionState } from "@/lib/design-tokens";
+import { enqueuePing, getQueuedPings, saveQueuedPings, type QueuedPing } from "@/lib/pingQueue";
 
 const RESULT_ICONS: Record<"VERIFIED" | "FLAGGED" | "INCONCLUSIVE", typeof CheckCircleIcon> = {
   VERIFIED: CheckCircleIcon,
@@ -48,7 +49,28 @@ interface Position {
 }
 
 const PING_INTERVAL_MS = 20_000;
+const QUEUE_RETRY_INTERVAL_MS = 30_000;
 const POOR_ACCURACY_THRESHOLD_METERS = 100;
+
+async function sendPingRequest(
+  sessionId: string,
+  ping: Pick<QueuedPing, "lat" | "lng" | "accuracyMeters">
+): Promise<"ok" | "rejected" | "network-error"> {
+  try {
+    const res = await fetch(`/api/sessions/${sessionId}/ping`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        lat: ping.lat,
+        lng: ping.lng,
+        accuracyMeters: ping.accuracyMeters,
+      }),
+    });
+    return res.ok ? "ok" : "rejected";
+  } catch {
+    return "network-error";
+  }
+}
 
 export default function SessionPage({ params }: { params: { id: string } }) {
   const { id } = params;
@@ -63,6 +85,14 @@ export default function SessionPage({ params }: { params: { id: string } }) {
 
   const [reportText, setReportText] = useState("");
   const [submittingReport, setSubmittingReport] = useState(false);
+
+  const [queuedPingCount, setQueuedPingCount] = useState(0);
+
+  // Pick up any pings left queued from a previous visit (e.g. the tab was
+  // closed mid-session while offline) as soon as we know the session id.
+  useEffect(() => {
+    setQueuedPingCount(getQueuedPings(id).length);
+  }, [id]);
 
   const refetch = useCallback(async (): Promise<void> => {
     try {
@@ -120,23 +150,60 @@ export default function SessionPage({ params }: { params: { id: string } }) {
     };
   }, [session?.state]);
 
-  // Send the latest known position every 20s while ACTIVE.
+  // Send the latest known position every 20s while ACTIVE. A network failure
+  // (offline, connection dropped) queues the ping in localStorage instead of
+  // dropping it; a bad HTTP status (e.g. session no longer ACTIVE) is a real
+  // rejection, not a connectivity issue, so it's just dropped as before.
   useEffect(() => {
     if (session?.state !== "ACTIVE") return;
 
     const interval = setInterval(() => {
       const pos = positionRef.current;
       if (!pos) return;
-      fetch(`/api/sessions/${id}/ping`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(pos),
-      }).catch(() => {
-        // best-effort; the next tick will retry with the latest position
-      });
+
+      void (async () => {
+        const result = await sendPingRequest(id, pos);
+        if (result === "network-error") {
+          const queue = enqueuePing(id, { ...pos, timestamp: new Date().toISOString() });
+          setQueuedPingCount(queue.length);
+        }
+      })();
     }, PING_INTERVAL_MS);
 
     return () => clearInterval(interval);
+  }, [session?.state, id]);
+
+  // Retry queued pings: once up front (in case some are left over from a
+  // previous visit), on the browser's `online` event, and on a 30s interval
+  // as a fallback since `online` doesn't fire reliably in every browser.
+  useEffect(() => {
+    if (session?.state !== "ACTIVE") return;
+
+    const flushQueue = async (): Promise<void> => {
+      let queue = getQueuedPings(id);
+      while (queue.length > 0) {
+        const result = await sendPingRequest(id, queue[0]);
+        if (result === "network-error") break; // still offline; retry later
+        // "ok" or a definitive "rejected" both resolve this queued ping —
+        // a rejection (e.g. session no longer ACTIVE) will never succeed on
+        // retry, so drop it rather than blocking the rest of the queue forever.
+        queue = queue.slice(1);
+        saveQueuedPings(id, queue);
+        setQueuedPingCount(queue.length);
+      }
+    };
+
+    void flushQueue();
+
+    window.addEventListener("online", flushQueue);
+    const retryInterval = setInterval(() => {
+      void flushQueue();
+    }, QUEUE_RETRY_INTERVAL_MS);
+
+    return () => {
+      window.removeEventListener("online", flushQueue);
+      clearInterval(retryInterval);
+    };
   }, [session?.state, id]);
 
   async function callAction(path: string, body?: unknown): Promise<void> {
@@ -288,6 +355,13 @@ export default function SessionPage({ params }: { params: { id: string } }) {
                 )
               )}
             </Card>
+
+            {queuedPingCount > 0 && (
+              <Card className="flex items-center gap-2 border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                <Spinner className="h-4 w-4 flex-shrink-0 text-slate-400" />
+                {queuedPingCount} ping{queuedPingCount === 1 ? "" : "s"} queued, will retry
+              </Card>
+            )}
 
             <Button variant="secondary" onClick={handleEnd}>
               End Visit
