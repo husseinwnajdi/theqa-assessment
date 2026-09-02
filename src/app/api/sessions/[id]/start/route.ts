@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { transitionErrorResponse } from "@/lib/api-errors";
 import { prisma } from "@/lib/prisma";
+import { sessionEvents } from "@/lib/sessionEvents";
 import { assertCanStart } from "@/lib/sessionTransitions";
 
 export async function POST(
@@ -24,6 +25,8 @@ export async function POST(
     where: { id: session.id },
     data: { state: "ACTIVE", startedAt: new Date() },
   });
+
+  sessionEvents.emit(updated.id);
 
   return NextResponse.json(updated);
 }
