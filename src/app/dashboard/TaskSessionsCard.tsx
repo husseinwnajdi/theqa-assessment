@@ -8,6 +8,8 @@ export interface TaskSession {
   state: SessionState;
   participant: { name: string; email: string };
   result: { confidenceScore: number; reasons: string[] } | null;
+  lastPingDistanceMeters: number | null;
+  lastPingInRange: boolean | null;
 }
 
 export interface TaskWithSessions {
@@ -55,6 +57,22 @@ export function TaskSessionsCard({
                 </div>
 
                 <div className="flex items-center gap-3">
+                  {session.state === "ACTIVE" && session.lastPingDistanceMeters !== null && (
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
+                        session.lastPingInRange
+                          ? "border-green-200 bg-green-50 text-green-700"
+                          : "border-red-200 bg-red-50 text-red-700"
+                      }`}
+                    >
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          session.lastPingInRange ? "bg-green-500" : "bg-red-500"
+                        }`}
+                      />
+                      {Math.round(session.lastPingDistanceMeters)}m from target
+                    </span>
+                  )}
                   {session.result && (
                     <ConfidenceBar
                       score={session.result.confidenceScore}

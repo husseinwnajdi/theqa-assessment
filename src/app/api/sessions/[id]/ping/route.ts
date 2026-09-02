@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { transitionErrorResponse } from "@/lib/api-errors";
+import { haversineMeters } from "@/lib/geo";
 import { prisma } from "@/lib/prisma";
+import { sessionEvents } from "@/lib/sessionEvents";
 import { assertCanPing } from "@/lib/sessionTransitions";
 
 interface PingBody {
@@ -14,7 +16,10 @@ export async function POST(
   request: Request,
   { params }: { params: { id: string } }
 ): Promise<NextResponse> {
-  const session = await prisma.session.findUnique({ where: { id: params.id } });
+  const session = await prisma.session.findUnique({
+    where: { id: params.id },
+    include: { task: true },
+  });
 
   if (!session) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
@@ -29,6 +34,14 @@ export async function POST(
   const body: PingBody = await request.json();
   const now = new Date();
 
+  const distanceMeters = haversineMeters(
+    body.lat,
+    body.lng,
+    session.task.targetLat,
+    session.task.targetLng
+  );
+  const inRange = distanceMeters <= session.task.radiusMeters;
+
   const [ping] = await prisma.$transaction([
     prisma.locationPing.create({
       data: {
@@ -40,9 +53,15 @@ export async function POST(
     }),
     prisma.session.update({
       where: { id: session.id },
-      data: { lastPingAt: now },
+      data: {
+        lastPingAt: now,
+        lastPingDistanceMeters: distanceMeters,
+        lastPingInRange: inRange,
+      },
     }),
   ]);
+
+  sessionEvents.emit(session.id);
 
   return NextResponse.json(ping);
 }

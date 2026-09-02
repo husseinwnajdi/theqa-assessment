@@ -44,6 +44,8 @@ model Session {
   startedAt     DateTime?
   endedAt       DateTime?
   lastPingAt    DateTime?
+  lastPingDistanceMeters Float?
+  lastPingInRange        Boolean?
   pings         LocationPing[]
   report        Report?
   result        VerificationResult?

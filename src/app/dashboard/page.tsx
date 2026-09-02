@@ -16,6 +16,8 @@ interface StreamedSession {
   state: SessionState;
   participant: { name: string; email: string };
   result: { confidenceScore: number; reasons: string[] } | null;
+  lastPingDistanceMeters: number | null;
+  lastPingInRange: boolean | null;
 }
 
 const FLASH_DURATION_MS = 1600;

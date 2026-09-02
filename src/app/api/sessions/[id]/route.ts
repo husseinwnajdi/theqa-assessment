@@ -5,6 +5,12 @@ import { isStale } from "@/lib/sessionTransitions";
 
 const include = { task: true, pings: true, report: true, result: true } as const;
 
+// Live proximity (lastPingDistanceMeters/lastPingInRange) is a business-dashboard-only
+// signal — deliberately omitted here so the participant-facing session view never sees
+// it, at the API level, not just in the UI. Showing it would let a participant game the
+// location check instead of genuinely completing the task.
+const omit = { lastPingDistanceMeters: true, lastPingInRange: true } as const;
+
 export async function GET(
   _request: Request,
   { params }: { params: { id: string } }
@@ -12,6 +18,7 @@ export async function GET(
   const session = await prisma.session.findUnique({
     where: { id: params.id },
     include,
+    omit,
   });
 
   if (!session) {
@@ -23,6 +30,7 @@ export async function GET(
       where: { id: session.id },
       data: { state: "ENDED", endedAt: new Date() },
       include,
+      omit,
     });
     return NextResponse.json(updated);
   }
