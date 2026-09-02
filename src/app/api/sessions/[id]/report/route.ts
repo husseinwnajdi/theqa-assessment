@@ -64,31 +64,48 @@ export async function POST(
     where: { sessionId: session.id },
   });
 
-  const scoreResponse = await fetch(`${VERIFICATION_SERVICE_URL}/score`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      targetLat: session.task.targetLat,
-      targetLng: session.task.targetLng,
-      radiusMeters: session.task.radiusMeters,
-      pings: pings.map((ping) => ({
-        lat: ping.lat,
-        lng: ping.lng,
-        accuracyMeters: ping.accuracyMeters,
-        timestamp: ping.timestamp,
-      })),
-      reportText: body.text,
-    }),
-  });
+  let score: ScoreResponseBody;
+  try {
+    const scoreResponse = await fetch(`${VERIFICATION_SERVICE_URL}/score`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        targetLat: session.task.targetLat,
+        targetLng: session.task.targetLng,
+        radiusMeters: session.task.radiusMeters,
+        pings: pings.map((ping) => ({
+          lat: ping.lat,
+          lng: ping.lng,
+          accuracyMeters: ping.accuracyMeters,
+          timestamp: ping.timestamp,
+        })),
+        reportText: body.text,
+      }),
+    });
 
-  if (!scoreResponse.ok) {
+    if (!scoreResponse.ok) {
+      throw new Error(`Verification service responded with ${scoreResponse.status}`);
+    }
+
+    score = await scoreResponse.json();
+  } catch {
+    // Roll back so the session isn't left stranded in REPORT_SUBMITTED with
+    // no way to retry: a fetch failure (e.g. ECONNREFUSED) throws here just
+    // like a non-2xx response, so both paths need the same rollback.
+    await prisma.$transaction([
+      prisma.report.delete({ where: { sessionId: session.id } }),
+      prisma.session.update({
+        where: { id: session.id },
+        data: { state: "ENDED" },
+      }),
+    ]);
+
     return NextResponse.json(
       { error: "Verification service request failed" },
       { status: 502 }
     );
   }
 
-  const score: ScoreResponseBody = await scoreResponse.json();
   const finalState = resolveVerificationState(score.confidenceScore);
 
   const [result, updatedSession] = await prisma.$transaction([

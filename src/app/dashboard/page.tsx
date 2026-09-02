@@ -8,6 +8,9 @@ import { ConfidenceBar } from "@/components/ConfidenceBar";
 import { StateBadge } from "@/components/StateBadge";
 import { SESSION_STATE_STYLES, type SessionState } from "@/lib/design-tokens";
 
+import { AssignableTaskCard } from "./AssignableTaskCard";
+import { CreateTaskForm, type CreatedTask } from "./CreateTaskForm";
+
 interface DashboardSession {
   id: string;
   state: SessionState;
@@ -20,6 +23,7 @@ const FLASH_DURATION_MS = 1600;
 export default function DashboardPage() {
   const [sessions, setSessions] = useState<DashboardSession[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tasks, setTasks] = useState<CreatedTask[]>([]);
   const [flashingIds, setFlashingIds] = useState<Set<string>>(new Set());
   const flashTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
@@ -78,6 +82,20 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-bold text-slate-900">Business Dashboard</h1>
           <p className="text-sm text-slate-500">Updates live as reports are verified</p>
         </div>
+
+        <section className="mb-10 space-y-4">
+          <h2 className="text-lg font-semibold text-slate-900">Tasks</h2>
+          <CreateTaskForm onCreated={(task) => setTasks((prev) => [task, ...prev])} />
+          {tasks.length > 0 && (
+            <div className="space-y-3">
+              {tasks.map((task) => (
+                <AssignableTaskCard key={task.id} task={task} />
+              ))}
+            </div>
+          )}
+        </section>
+
+        <h2 className="mb-4 text-lg font-semibold text-slate-900">Sessions</h2>
 
         {loading ? (
           <p className="text-sm text-slate-500">Loading sessions…</p>
