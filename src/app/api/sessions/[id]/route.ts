@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
+import { sessionEvents } from "@/lib/sessionEvents";
 import { isStale } from "@/lib/sessionTransitions";
 
 const include = { task: true, pings: true, report: true, result: true } as const;
@@ -32,6 +33,7 @@ export async function GET(
       include,
       omit,
     });
+    sessionEvents.emit(updated.id);
     return NextResponse.json(updated);
   }
 
