@@ -3,6 +3,7 @@ import { sessionEvents } from "@/lib/sessionEvents";
 
 export const dynamic = "force-dynamic";
 
+// DECISION: SSE over WebSockets/polling — the dashboard only ever receives updates, never sends anything back, so a one-directional stream fits exactly with less overhead than WebSockets and less latency than polling.
 export async function GET(request: Request): Promise<Response> {
   const encoder = new TextEncoder();
   let unsubscribe: (() => void) | null = null;

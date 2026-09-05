@@ -50,6 +50,9 @@ model Session {
   report        Report?
   result        VerificationResult?
   createdAt     DateTime      @default(now())
+
+  @@index([state])
+  @@index([taskId])
 }
 
 model LocationPing {

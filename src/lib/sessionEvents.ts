@@ -9,6 +9,7 @@ class SessionEvents {
     this.emitter.setMaxListeners(0);
   }
 
+  // DECISION: every route that changes session state must call this explicitly — there's no automatic hook, so a route that forgets it silently breaks live dashboard updates for that transition only.
   emit(sessionId: string): void {
     this.emitter.emit(SESSION_UPDATED, sessionId);
   }

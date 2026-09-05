@@ -78,6 +78,36 @@ Verify for real: click through the actual flow in a browser, confirm
 the location prompt fires and pings actually reach the server.
 ```
 
+## Full visual design pass (design system + both pages redesigned)
+
+```
+Do a full visual design pass on the app. Keep all existing logic,
+routes, and API calls untouched, this is styling only.
+
+Design system (create src/lib/design-tokens or use Tailwind config):
+neutral slate/zinc base, one accent color for primary actions,
+color reserved for state only (green/amber/red/slate), real
+typographic hierarchy, consistent spacing, rounded corners, subtle
+borders instead of heavy shadows, no gradients or generic hero-blob
+look.
+
+Shared shell: a minimal shared header component shown on both
+/dashboard and /session/[id] so both screens read as one product.
+
+Business dashboard: replace the plain table with card-based rows —
+task name prominent, state as a proper badge, confidence score with
+a progress bar, a subtle flash animation on live SSE updates, and a
+real empty state instead of a blank table.
+
+Participant session page: a properly designed screen per state
+(ASSIGNED/ACTIVE/ENDED/report form/final result), live location data
+as a real status card, poor-accuracy warning visually distinct but
+non-alarming, final result states visually distinct at a glance.
+
+Don't touch: any API route, sessionTransitions.ts, the FastAPI
+service, or any test file.
+```
+
 ## Task creation (added after auditing the build against the brief)
 
 ```
@@ -92,6 +122,35 @@ Add task creation to the business dashboard.
 
 Verify for real: create a task, assign it, confirm the generated 
 session link actually resolves.
+```
+
+## Task-grouped dashboard view (replacing the flat session list)
+
+```
+Add a task-grouped view to the dashboard, replacing the flat session
+list.
+
+1. New route GET /api/dashboard/tasks-with-sessions — returns all
+   Tasks, each with an array of their Sessions (participant, state,
+   confidence score + reasons if resolved), most recent task first.
+2. Redesign the dashboard's lower section: one card per Task, with
+   its Sessions listed underneath — reuse the existing badge/
+   ConfidenceBar components, not new ones.
+3. A task with zero sessions yet should show clearly ("No
+   participants assigned yet") rather than an empty gap.
+4. Keep the existing SSE live-update behavior working — a session's
+   row within its task card should still update live when verified,
+   same as before.
+
+Don't touch the Create Task form, the assign flow, or any session/
+scoring logic. This is a read/display change to how existing data is
+grouped and shown.
+
+Verify this for real before calling it done: create two tasks at
+different coordinates, assign 2-3 sessions across them (mix of
+states), confirm the grouping actually renders correctly, and
+confirm the SSE live-update still works on a session nested inside a
+task card, not just at the top level.
 ```
 
 ## Live proximity check (closing a real spec-compliance gap)
@@ -146,6 +205,41 @@ just by reading the code:
 
 Report the actual before/after session state you observed at each 
 step, not just that the code looks right.
+```
+
+## Closing the SSE-emit gaps on start/end and the lazy staleness check
+
+Found by manually testing each transition individually after the ping/
+report emit calls were already in place — each of these was its own
+gap, not caught by the same fix.
+
+```
+Add sessionEvents.emit(sessionId) to the POST /api/sessions/[id]/start
+and POST /api/sessions/[id]/end routes, matching the pattern already
+used in ping and report. This should make the dashboard's
+session-state badge (ASSIGNED → ACTIVE → ENDED) update live via SSE,
+not just the final VERIFIED/FLAGGED/INCONCLUSIVE result. Don't touch
+session state transition logic itself.
+
+Verify for real: open the dashboard in one tab with SSE connected,
+start and then end a session from another tab/curl, confirm the
+state badge updates live in the first tab without reload at each
+transition.
+```
+
+```
+In GET /api/sessions/[id], when isStale() triggers the lazy
+ACTIVE→ENDED transition, add sessionEvents.emit(sessionId) right
+after that update, same pattern as start/end/ping/report. Don't
+touch anything else.
+
+Verify for real: set HEARTBEAT_TIMEOUT_MS to 15 seconds (temporary,
+as before), open the dashboard in one tab with SSE connected, start a
+session in another tab, wait ~20s without ending it, then trigger the
+lazy check by loading the session page once. Confirm the dashboard
+tab updates to Ended live, without a dashboard reload. Then revert
+HEARTBEAT_TIMEOUT_MS back to 5 minutes and confirm via git diff that
+only that one line changed back.
 ```
 
 ## A note on the pattern behind these prompts

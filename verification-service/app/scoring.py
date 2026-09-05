@@ -18,6 +18,7 @@ def score_visit(target_lat, target_lng, radius_meters, pings, report_text):
     if not pings:
         return {"confidenceScore": 0, "reasons": ["No location pings recorded"]}
 
+    # DECISION: 200 km/h is well above any realistic on-foot/local-transit speed for a mystery-shopping visit, chosen to catch GPS spoofing without false-flagging legitimate movement between pings.
     # Filter out spoofing-suspicious jumps (>200 km/h implied speed)
     valid_pings = [pings[0]]
     excluded = 0

@@ -20,7 +20,7 @@ can be tested, versioned, and reasoned about independently of the
 request/response plumbing around it. It also demonstrates the
 TypeScript + Python requirement naturally rather than artificially.
 
-*(Architecture diagram: attached separately.)*
+*(Architecture diagram: see docs/architecture-diagram.svg)*
 
 ## The core design decision: confidence, not a boolean
 

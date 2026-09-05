@@ -101,3 +101,9 @@ pytest
 4. Open that link to see the participant-facing flow: start the visit,
    allow location access, end the visit, submit a report
 5. Watch the dashboard update live as the report is scored
+
+Alternatively, skip steps 2–3 by running `npx prisma db seed` — it's
+an idempotent shortcut that creates one Task/Participant/Session
+directly in the database (at the Eiffel Tower) and prints the
+session ID, useful for a quick smoke test without going through the
+UI first.

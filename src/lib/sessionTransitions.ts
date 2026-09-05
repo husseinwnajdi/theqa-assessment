@@ -33,6 +33,7 @@ export function isStale(state: SessionState, lastPingAt: Date | null, now: Date)
   return now.getTime() - lastPingAt.getTime() > HEARTBEAT_TIMEOUT_MS;
 }
 
+// DECISION: 70/40 thresholds leave a wide INCONCLUSIVE band instead of a single pass/fail cutoff, since a confidence score close to the line shouldn't be forced into VERIFIED or FLAGGED.
 export function resolveVerificationState(confidenceScore: number): SessionState {
   if (confidenceScore >= 70) return "VERIFIED";
   if (confidenceScore >= 40) return "INCONCLUSIVE";

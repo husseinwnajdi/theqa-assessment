@@ -6,10 +6,7 @@ import { isStale } from "@/lib/sessionTransitions";
 
 const include = { task: true, pings: true, report: true, result: true } as const;
 
-// Live proximity (lastPingDistanceMeters/lastPingInRange) is a business-dashboard-only
-// signal — deliberately omitted here so the participant-facing session view never sees
-// it, at the API level, not just in the UI. Showing it would let a participant game the
-// location check instead of genuinely completing the task.
+// DECISION: live proximity fields are omitted here at the API level (not just hidden in the UI) so a participant can never see them and game the location check.
 const omit = { lastPingDistanceMeters: true, lastPingInRange: true } as const;
 
 export async function GET(
